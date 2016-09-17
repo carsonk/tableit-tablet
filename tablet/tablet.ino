@@ -53,6 +53,7 @@ void draw_page() {
   int i = 0;
   int frame_start = (MARGIN * 2) + BOXSIZE + MARGIN;
   int frame_end = tft.height() - MARGIN;
+  int y_pos = 0;
   
   tft.reset();
 
@@ -64,8 +65,15 @@ void draw_page() {
   tft.fillRect(MARGIN, MARGIN, BOXSIZE, BOXSIZE, RED); // Page back.
   tft.fillRect(tft.width() - BOXSIZE - MARGIN, MARGIN, BOXSIZE, BOXSIZE, GREEN); // Page forward.
 
+  tft.setTextSize(2);
+
   for(i = 0; i < 4; i++) {
-    tft.fillRect(MARGIN, i * (MENU_ITEM_CONTAINER_HEIGHT + MARGIN) + HEADER_SIZE, tft.width() - MARGIN * 2, MENU_ITEM_CONTAINER_HEIGHT, BLACK);
+    y_pos = i * (MENU_ITEM_CONTAINER_HEIGHT + MARGIN) + HEADER_SIZE;
+    tft.fillRect(MARGIN, y_pos, tft.width() - MARGIN * 2, MENU_ITEM_CONTAINER_HEIGHT, BLACK);
+    tft.setCursor(MARGIN * 2, y_pos + 10);
+    tft.print("Potato");
+    tft.setCursor(tft.width() - MARGIN - 40, y_pos + 10);
+    tft.print("$4");
   }
 }
 
