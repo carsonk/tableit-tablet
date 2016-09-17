@@ -36,62 +36,53 @@ TouchScreen ts = TouchScreen(XP, YP, XM, YM, 300);
 Adafruit_TFTLCD tft(LCD_CS, LCD_CD, LCD_WR, LCD_RD, LCD_RESET);
 
 #define BOXSIZE 40
+#define MARGIN 10
 #define PENRADIUS 3
+
+#define MENU_ITEM_CONTAINER_HEIGHT 50
+#define HEADER_SIZE (BOXSIZE + (MARGIN * 2))
+
 int oldcolor, currentcolor;
+
+struct MenuItem {
+  char title[50];
+  char price;
+};
+
+void draw_page() {
+  int i = 0;
+  int frame_start = (MARGIN * 2) + BOXSIZE + MARGIN;
+  int frame_end = tft.height() - MARGIN;
+  
+  tft.reset();
+
+  tft.begin(0x9341);
+  tft.setRotation(2);
+
+  tft.fillScreen(WHITE);
+  
+  tft.fillRect(MARGIN, MARGIN, BOXSIZE, BOXSIZE, RED); // Page back.
+  tft.fillRect(tft.width() - BOXSIZE - MARGIN, MARGIN, BOXSIZE, BOXSIZE, GREEN); // Page forward.
+
+  for(i = 0; i < 4; i++) {
+    tft.fillRect(MARGIN, i * (MENU_ITEM_CONTAINER_HEIGHT + MARGIN) + HEADER_SIZE, tft.width() - MARGIN * 2, MENU_ITEM_CONTAINER_HEIGHT, BLACK);
+  }
+}
 
 void setup(void) {
   Serial.begin(9600);
-  Serial.println(F("Paint!"));
+  Serial.println(F("MENU start."));
   
-  tft.reset();
-  
-  uint16_t identifier = tft.readID();
-  if(identifier == 0x9325) {
-    Serial.println(F("Found ILI9325 LCD driver"));
-  } else if(identifier == 0x9328) {
-    Serial.println(F("Found ILI9328 LCD driver"));
-  } else if(identifier == 0x4535) {
-    Serial.println(F("Found LGDP4535 LCD driver"));
-  }else if(identifier == 0x7575) {
-    Serial.println(F("Found HX8347G LCD driver"));
-  } else if(identifier == 0x9341) {
-    Serial.println(F("Found ILI9341 LCD driver"));
-  } else if(identifier == 0x8357) {
-    Serial.println(F("Found HX8357D LCD driver"));
-  } else if(identifier==0x0101)
-  {     
-      identifier=0x9341;
-       Serial.println(F("Found 0x9341 LCD driver"));
-  }else {
-    Serial.print(F("Unknown LCD driver chip: "));
-    Serial.println(identifier, HEX);
-    Serial.println(F("If using the Adafruit 2.8\" TFT Arduino shield, the line:"));
-    Serial.println(F("  #define USE_ADAFRUIT_SHIELD_PINOUT"));
-    Serial.println(F("should appear in the library header (Adafruit_TFT.h)."));
-    Serial.println(F("If using the breakout board, it should NOT be #defined!"));
-    Serial.println(F("Also if using the breakout, double-check that all wiring"));
-    Serial.println(F("matches the tutorial."));
-    identifier=0x9341;
-   
-  }
+  Serial.println("Bloop.");
 
-  tft.begin(identifier);
-  tft.setRotation(2);
-
-  tft.fillScreen(BLACK);
-
-  tft.fillRect(0, 0, BOXSIZE, BOXSIZE, RED);
-  tft.fillRect(BOXSIZE, 0, BOXSIZE, BOXSIZE, YELLOW);
-  tft.fillRect(BOXSIZE*2, 0, BOXSIZE, BOXSIZE, GREEN);
-  tft.fillRect(BOXSIZE*3, 0, BOXSIZE, BOXSIZE, CYAN);
-  tft.fillRect(BOXSIZE*4, 0, BOXSIZE, BOXSIZE, BLUE);
-  tft.fillRect(BOXSIZE*5, 0, BOXSIZE, BOXSIZE, MAGENTA);
-  // tft.fillRect(BOXSIZE*6, 0, BOXSIZE, BOXSIZE, WHITE);
- 
-  tft.drawRect(0, 0, BOXSIZE, BOXSIZE, WHITE);
-  currentcolor = RED;
+  draw_page();
  
   pinMode(13, OUTPUT);
+
+  Serial.print("height: ");
+  Serial.print(tft.height());
+  Serial.print(" width: ");
+  Serial.print(tft.width());
 }
 
 #define MINPRESSURE 10
@@ -119,52 +110,13 @@ void loop()
     Serial.print("\tPressure = "); Serial.println(p.z);
     */
     
-    if (p.y < (TS_MINY-5)) {
-      Serial.println("erase");
-      // press the bottom of the screen to erase 
-      tft.fillRect(0, BOXSIZE, tft.width(), tft.height()-BOXSIZE, BLACK);
-    }
     // scale from 0->1023 to tft.width
     p.x = map(p.x, TS_MINX, TS_MAXX, tft.width(), 0);
     p.y = (tft.height()-map(p.y, TS_MINY, TS_MAXY, tft.height(), 0));
-    /*
-    Serial.print("("); Serial.print(p.x);
-    Serial.print(", "); Serial.print(p.y);
-    Serial.println(")");
-    */
-    if (p.y < BOXSIZE) {
-       oldcolor = currentcolor;
 
-       if (p.x < BOXSIZE) { 
-         currentcolor = RED; 
-         tft.drawRect(0, 0, BOXSIZE, BOXSIZE, WHITE);
-       } else if (p.x < BOXSIZE*2) {
-         currentcolor = YELLOW;
-         tft.drawRect(BOXSIZE, 0, BOXSIZE, BOXSIZE, WHITE);
-       } else if (p.x < BOXSIZE*3) {
-         currentcolor = GREEN;
-         tft.drawRect(BOXSIZE*2, 0, BOXSIZE, BOXSIZE, WHITE);
-       } else if (p.x < BOXSIZE*4) {
-         currentcolor = CYAN;
-         tft.drawRect(BOXSIZE*3, 0, BOXSIZE, BOXSIZE, WHITE);
-       } else if (p.x < BOXSIZE*5) {
-         currentcolor = BLUE;
-         tft.drawRect(BOXSIZE*4, 0, BOXSIZE, BOXSIZE, WHITE);
-       } else if (p.x < BOXSIZE*6) {
-         currentcolor = MAGENTA;
-         tft.drawRect(BOXSIZE*5, 0, BOXSIZE, BOXSIZE, WHITE);
-       }
-
-       if (oldcolor != currentcolor) {
-          if (oldcolor == RED) tft.fillRect(0, 0, BOXSIZE, BOXSIZE, RED);
-          if (oldcolor == YELLOW) tft.fillRect(BOXSIZE, 0, BOXSIZE, BOXSIZE, YELLOW);
-          if (oldcolor == GREEN) tft.fillRect(BOXSIZE*2, 0, BOXSIZE, BOXSIZE, GREEN);
-          if (oldcolor == CYAN) tft.fillRect(BOXSIZE*3, 0, BOXSIZE, BOXSIZE, CYAN);
-          if (oldcolor == BLUE) tft.fillRect(BOXSIZE*4, 0, BOXSIZE, BOXSIZE, BLUE);
-          if (oldcolor == MAGENTA) tft.fillRect(BOXSIZE*5, 0, BOXSIZE, BOXSIZE, MAGENTA);
-       }
-    }
-    if (((p.y-PENRADIUS) > BOXSIZE) && ((p.y+PENRADIUS) < tft.height())) {
+    currentcolor = 0xEEEE;
+    
+    if ((p.y-PENRADIUS) && ((p.y+PENRADIUS) < tft.height())) {
       tft.fillCircle(p.x, p.y, PENRADIUS, currentcolor);
     }
   }
