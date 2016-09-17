@@ -42,18 +42,24 @@ Adafruit_TFTLCD tft(LCD_CS, LCD_CD, LCD_WR, LCD_RD, LCD_RESET);
 #define MENU_ITEM_CONTAINER_HEIGHT 50
 #define HEADER_SIZE (BOXSIZE + (MARGIN * 2))
 
+#define ITEMS_PER_PAGE 4
+
 int oldcolor, currentcolor;
 
 struct MenuItem {
-  char title[50];
-  char price;
+  char title[10];
+  int price;
 };
+
+MenuItem menu_list[20];
+char current_page = 1;
 
 void draw_page() {
   int i = 0;
   int frame_start = (MARGIN * 2) + BOXSIZE + MARGIN;
   int frame_end = tft.height() - MARGIN;
   int y_pos = 0;
+  MenuItem current_item;
   
   tft.reset();
 
@@ -67,21 +73,39 @@ void draw_page() {
 
   tft.setTextSize(2);
 
-  for(i = 0; i < 4; i++) {
+  for(i = 0; i < ITEMS_PER_PAGE; i++) {
+    Serial.println(i + (ITEMS_PER_PAGE * (current_page - 1)));
+    current_item = menu_list[i + (ITEMS_PER_PAGE * (current_page - 1))];
     y_pos = i * (MENU_ITEM_CONTAINER_HEIGHT + MARGIN) + HEADER_SIZE;
     tft.fillRect(MARGIN, y_pos, tft.width() - MARGIN * 2, MENU_ITEM_CONTAINER_HEIGHT, BLACK);
     tft.setCursor(MARGIN * 2, y_pos + 10);
-    tft.print("Potato");
+    tft.print(current_item.title);
     tft.setCursor(tft.width() - MARGIN - 40, y_pos + 10);
-    tft.print("$4");
+    tft.print("$");
+    Serial.println(current_item.price);
+    tft.print(current_item.price);
   }
 }
 
 void setup(void) {
   Serial.begin(9600);
   Serial.println(F("MENU start."));
+
+  int i = 0;
+  MenuItem item;
+
+  char title[10] = "Potato";
   
   Serial.println("Bloop.");
+
+  for(i = 0; i < 20; i++) {
+    Serial.print("I: "); Serial.print(i);
+    Serial.println(title);
+    item.title[0] = 0x0;
+    memcpy(&item.title, (void *)title, String("Potato").length() + 1);
+    item.price = 1 + i;
+    memcpy(&menu_list[i], &item, sizeof(MenuItem));
+  }
 
   draw_page();
  
