@@ -1,6 +1,8 @@
 #include <Adafruit_GFX.h>    // Core graphics library
 #include <Adafruit_TFTLCD.h> // Hardware-specific library
 #include <TouchScreen.h>
+#include <Ethernet.h>
+#include <ArduinoJson.h>
 
 #define BLACK   0x0000
 #define BLUE    0x001F
@@ -60,6 +62,12 @@ char current_page = 2;
 #define NEXT_BOX_X (tft.width() - BOXSIZE - MARGIN)
 #define NEXT_BOX_Y MARGIN
 
+IPAddress ip(192, 168, 0, 177);
+EthernetClient client;
+StaticJsonBuffer<200> jsonBuffer;
+
+char server[] = "www.google.com";
+
 void draw_page() {
   int i = 0;
   int frame_start = (MARGIN * 2) + BOXSIZE + MARGIN;
@@ -75,7 +83,6 @@ void draw_page() {
   tft.setTextSize(2);
 
   for(i = 0; i < ITEMS_PER_PAGE; i++) {
-    Serial.println(i + (ITEMS_PER_PAGE * (current_page - 1)));
     current_item = menu_list[i + (ITEMS_PER_PAGE * (current_page - 1))];
     y_pos = i * (MENU_ITEM_CONTAINER_HEIGHT + MARGIN) + HEADER_SIZE;
     tft.fillRect(MARGIN, y_pos, tft.width() - MARGIN * 2, MENU_ITEM_CONTAINER_HEIGHT, BLACK);
@@ -83,7 +90,6 @@ void draw_page() {
     tft.print(current_item.title);
     tft.setCursor(tft.width() - MARGIN - 40, y_pos + 10);
     tft.print("$");
-    Serial.println(current_item.price);
     tft.print(current_item.price);
   }
 }
@@ -91,22 +97,49 @@ void draw_page() {
 void setup(void) {
   Serial.begin(9600);
   Serial.println(F("MENU start."));
+  byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
 
   tft.reset();
 
   tft.begin(0x9341);
   tft.setRotation(2);
 
+  if (Ethernet.begin(mac) == 0) {
+    Serial.println("Failed to configure Ethernet using DHCP");
+    // try to congifure using IP address instead of DHCP:
+    Ethernet.begin(mac, ip);
+  }
+
+  delay(1000);
+  Serial.println("connecting...");
+
+  if (client.connect(server, 80)) {
+    Serial.println("connected");
+    // Make a HTTP request:
+    client.println("GET /search?q=arduino HTTP/1.1");
+    client.println("Host: www.google.com");
+    client.println("Connection: close");
+    client.println();
+  } else {
+    // if you didn't get a connection to the server:
+    Serial.println("connection failed");
+  }
+  
+  while (client.available()) {
+    char c = client.read();
+  }
+
+  // if the server's disconnected, stop the client:
+  if (!client.connected()) {
+    client.stop();
+  }
+  
   int i = 0;
   MenuItem item;
 
   char title[10] = "Potato";
-  
-  Serial.println("Bloop.");
 
   for(i = 0; i < 20; i++) {
-    Serial.print("I: "); Serial.print(i);
-    Serial.println(title);
     item.title[0] = 0x0;
     memcpy(&item.title, (void *)title, String("Potato").length() + 1);
     item.price = 1 + i;
@@ -116,11 +149,6 @@ void setup(void) {
   draw_page();
  
   pinMode(13, OUTPUT);
-
-  Serial.print("height: ");
-  Serial.print(tft.height());
-  Serial.print(" width: ");
-  Serial.print(tft.width());
 }
 
 #define MINPRESSURE 10
@@ -137,9 +165,6 @@ void loop()
   pinMode(XM, OUTPUT);
   pinMode(YP, OUTPUT);
   //pinMode(YM, OUTPUT);
-
-  // we have some minimum pressure we consider 'valid'
-  // pressure of 0 means no pressing!
 
   if (p.z > MINPRESSURE && p.z < MAXPRESSURE) {
     /*
