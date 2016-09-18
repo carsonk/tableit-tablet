@@ -76,76 +76,6 @@ EthernetClient client;
 
 char server[] = "104.131.189.231";
 
-void draw_page() {
-  int i = 0;
-  int frame_start = (MARGIN * 2) + BOXSIZE + MARGIN;
-  int frame_end = tft.height() - MARGIN;
-  int y_pos = 0;
-  MenuItem current_item;
-
-  tft.fillScreen(WHITE);
-  tft.setTextSize(2);
-  tft.setTextColor(WHITE);
-
-  // Page back
-  tft.fillRect(PREVIOUS_BOX_X, PREVIOUS_BOX_Y, BOXSIZE, BOXSIZE, RED);
-  tft.setCursor(PREVIOUS_BOX_X + MARGIN, PREVIOUS_BOX_Y + MARGIN);
-  tft.print('<');
-
-  // Confirm
-  tft.fillRect(CONFIRM_BOX_X, CONFIRM_BOX_Y, tft.width() - 2 * BOXSIZE - 4 * MARGIN, BOXSIZE, GREEN);
-  tft.setCursor(CONFIRM_BOX_X + MARGIN, CONFIRM_BOX_Y + MARGIN);
-  tft.print("Confirm");
-
-  // Page forward
-  tft.fillRect(NEXT_BOX_X, NEXT_BOX_Y, BOXSIZE, BOXSIZE, RED);
-  tft.setCursor(NEXT_BOX_X + MARGIN, NEXT_BOX_Y + MARGIN);
-  tft.print('>');
-
-  for(i = 0; i < ITEMS_PER_PAGE; i++) {
-    current_item = menu_list[i + (ITEMS_PER_PAGE * (current_page - 1))];
-    if(current_item.id != 0) {
-      y_pos = i * (MENU_ITEM_CONTAINER_HEIGHT + MARGIN) + HEADER_SIZE;
-      tft.fillRect(MARGIN, y_pos, tft.width() - MARGIN * 2, MENU_ITEM_CONTAINER_HEIGHT, BLACK);
-      tft.setCursor(MARGIN * 2, y_pos + 10);
-      tft.print(current_item.title);
-      tft.setCursor(tft.width() - MARGIN - 40, y_pos + 10);
-      tft.print("$");
-      tft.print(current_item.price);
-    }
-  }
-
-  tft.setTextColor(BLACK);
-
-  // Page number
-  tft.setCursor(MARGIN, tft.height() - MARGIN - 15);
-  tft.print("Page ");
-  tft.print((int)current_page);
-
-  // Live total price of order
-  tft.setCursor(tft.width() - MARGIN - 100, tft.height() - MARGIN - 15);
-  tft.print("Cost:");
-  tft.setCursor(tft.width() - MARGIN - 40, tft.height() - MARGIN - 15);
-  tft.print("$");
-  tft.print(total_cost);
-}
-
-void message(boolean error) {
-  tft.fillScreen(error ? RED : GREEN);
-  tft.setTextSize(3);
-  tft.setTextColor(WHITE);
-  tft.setCursor(tft.width() / 2 - (error ? 75 : 45), tft.height() / 2 - 11);
-  tft.print(error ? "Could not" : "Order");
-  tft.setCursor(tft.width() / 2 - (error ? 65 : 85), tft.height() / 2 + 11);
-  tft.print(error ? "connect!" : "confirmed!");
-  delay(3000);
-  if (!error) {
-    total_cart_items = 0;
-    total_cost = 0;
-  }
-  draw_page();
-}
-
 void setup(void) {
   Serial.begin(9600);
   Serial.println(F("MENU start."));
@@ -180,6 +110,72 @@ void setup(void) {
  
   pinMode(13, OUTPUT);
 }
+
+#define MINPRESSURE 10
+#define MAXPRESSURE 1000
+
+void loop()
+{
+  digitalWrite(13, HIGH);
+  TSPoint p = ts.getPoint();
+  digitalWrite(13, LOW);
+
+  // if sharing pins, you'll need to fix the directions of the touchscreen pins
+  //pinMode(XP, OUTPUT);
+  pinMode(XM, OUTPUT);
+  pinMode(YP, OUTPUT);
+  //pinMode(YM, OUTPUT);
+
+  if(connected_to_server) {
+    get_server_content();
+  }
+
+  if (p.z > MINPRESSURE && p.z < MAXPRESSURE) {
+    // scale from 0->1023 to tft.width
+    p.x = map(p.x, TS_MINX, TS_MAXX, tft.width(), 0);
+    p.y = (tft.height()-map(p.y, TS_MINY, TS_MAXY, tft.height(), 0));
+
+    // Confirm button pressed, post order to server and reset order
+    if (p.x >= CONFIRM_BOX_X && p.x <= (NEXT_BOX_X - MARGIN) && p.y >= CONFIRM_BOX_Y && p.y <= (CONFIRM_BOX_Y + BOXSIZE)) {
+      if (total_cart_items > 0) {
+        message(!submit_order() /*if there was an error posting the order*/);
+      }
+    }
+
+    // Menu item pressed, add to cart
+    if(p.y >= HEADER_SIZE && p.x >= MARGIN && p.y <= (tft.height() - MARGIN))
+    {
+      int box_index_pressed = (p.y - HEADER_SIZE) / (MENU_ITEM_CONTAINER_HEIGHT + MARGIN);
+      MenuItem to_add;
+      
+      if(box_index_pressed < ITEMS_PER_PAGE)
+      {
+        to_add = menu_list[box_index_pressed + (ITEMS_PER_PAGE * (current_page - 1))];
+        if (to_add.id > 0) {
+          total_cost += to_add.price;
+          cart_menu_ids[total_cart_items] = to_add.id;
+          total_cart_items++;
+          draw_page();
+        }
+      }
+    }
+    
+    if ((p.x >= PREVIOUS_BOX_X && p.x <= (PREVIOUS_BOX_X + BOXSIZE)) && (p.y >= PREVIOUS_BOX_Y && p.y <= (PREVIOUS_BOX_Y + BOXSIZE))) {
+      // "Previous Page" button pressed.
+      if(current_page > 1) {
+        current_page--;
+        draw_page();
+      }
+    } else if ((p.x >= NEXT_BOX_X && p.x <= (NEXT_BOX_X + BOXSIZE)) && (p.y >= NEXT_BOX_Y && p.y <= (NEXT_BOX_Y + BOXSIZE))) {
+      // "Next Page" button pressed.
+      if(next_page_exists()) {
+        current_page++;
+        draw_page();
+      }
+    }
+  }
+}
+
 
 void get_server_content()
 {
@@ -238,9 +234,6 @@ void get_server_content()
   draw_page();
 }
 
-#define MINPRESSURE 10
-#define MAXPRESSURE 1000
-
 boolean submit_order()
 {
   char c = 0;
@@ -291,64 +284,83 @@ boolean submit_order()
   return false;
 }
 
-void loop()
-{
-  digitalWrite(13, HIGH);
-  TSPoint p = ts.getPoint();
-  digitalWrite(13, LOW);
+boolean next_page_exists() {
+  return (num_items % ITEMS_PER_PAGE == 0) ? (current_page < (num_items / ITEMS_PER_PAGE)) : (current_page < (num_items / ITEMS_PER_PAGE) + 1);
+}
 
-  // if sharing pins, you'll need to fix the directions of the touchscreen pins
-  //pinMode(XP, OUTPUT);
-  pinMode(XM, OUTPUT);
-  pinMode(YP, OUTPUT);
-  //pinMode(YM, OUTPUT);
+/* Displays a message on the screen with red of green background,
+** telling user that connection succeeded or failed. */
+void message(boolean error) {
+  tft.fillScreen(error ? RED : GREEN);
+  tft.setTextSize(3);
+  tft.setTextColor(WHITE);
+  tft.setCursor(tft.width() / 2 - (error ? 75 : 45), tft.height() / 2 - 11);
+  tft.print(error ? "Could not" : "Order");
+  tft.setCursor(tft.width() / 2 - (error ? 65 : 85), tft.height() / 2 + 11);
+  tft.print(error ? "connect!" : "confirmed!");
+  delay(3000);
+  if (!error) {
+    total_cart_items = 0;
+    total_cost = 0;
+  }
+  draw_page();
+}
 
-  if(connected_to_server) {
-    get_server_content();
+/* Draws out the standard menu  ordering page. */
+void draw_page() {
+  int i = 0;
+  int frame_start = (MARGIN * 2) + BOXSIZE + MARGIN;
+  int frame_end = tft.height() - MARGIN;
+  int y_pos = 0;
+  MenuItem current_item;
+
+  tft.fillScreen(WHITE);
+  tft.setTextSize(2);
+  tft.setTextColor(WHITE);
+
+  // Page back
+  if(current_page > 1) {
+    tft.fillRect(PREVIOUS_BOX_X, PREVIOUS_BOX_Y, BOXSIZE, BOXSIZE, RED);
+    tft.setCursor(PREVIOUS_BOX_X + MARGIN, PREVIOUS_BOX_Y + MARGIN);
+    tft.print('<');
   }
 
-  if (p.z > MINPRESSURE && p.z < MAXPRESSURE) {
-    // scale from 0->1023 to tft.width
-    p.x = map(p.x, TS_MINX, TS_MAXX, tft.width(), 0);
-    p.y = (tft.height()-map(p.y, TS_MINY, TS_MAXY, tft.height(), 0));
+  // Confirm
+  tft.fillRect(CONFIRM_BOX_X, CONFIRM_BOX_Y, tft.width() - 2 * BOXSIZE - 4 * MARGIN, BOXSIZE, GREEN);
+  tft.setCursor(CONFIRM_BOX_X + MARGIN, CONFIRM_BOX_Y + MARGIN);
+  tft.print("Confirm");
 
-    // Confirm button pressed, post order to server and reset order
-    if (p.x >= CONFIRM_BOX_X && p.x <= (NEXT_BOX_X - MARGIN) && p.y >= CONFIRM_BOX_Y && p.y <= (CONFIRM_BOX_Y + BOXSIZE)) {
-      if (total_cart_items > 0) {
-        message(!submit_order() /*if there was an error posting the order*/);
-      }
-    }
+  // Page forward
+  if(next_page_exists()) {
+    tft.fillRect(NEXT_BOX_X, NEXT_BOX_Y, BOXSIZE, BOXSIZE, RED);
+    tft.setCursor(NEXT_BOX_X + MARGIN, NEXT_BOX_Y + MARGIN);
+    tft.print('>');
+  }
 
-    // Menu item pressed, add to cart
-    if(p.y >= HEADER_SIZE && p.x >= MARGIN && p.y <= (tft.height() - MARGIN))
-    {
-      int box_index_pressed = (p.y - HEADER_SIZE) / (MENU_ITEM_CONTAINER_HEIGHT + MARGIN);
-      MenuItem to_add;
-      
-      if(box_index_pressed < ITEMS_PER_PAGE)
-      {
-        to_add = menu_list[box_index_pressed + (ITEMS_PER_PAGE * (current_page - 1))];
-        if (to_add.id > 0) {
-          total_cost += to_add.price;
-          cart_menu_ids[total_cart_items] = to_add.id;
-          total_cart_items++;
-          draw_page();
-        }
-      }
-    }
-    
-    if ((p.x >= PREVIOUS_BOX_X && p.x <= (PREVIOUS_BOX_X + BOXSIZE)) && (p.y >= PREVIOUS_BOX_Y && p.y <= (PREVIOUS_BOX_Y + BOXSIZE))) {
-      // "Previous Page" button pressed.
-      if(current_page > 1) {
-        current_page--;
-        draw_page();
-      }
-    } else if ((p.x >= NEXT_BOX_X && p.x <= (NEXT_BOX_X + BOXSIZE)) && (p.y >= NEXT_BOX_Y && p.y <= (NEXT_BOX_Y + BOXSIZE))) {
-      // "Next Page" button pressed.
-      if((num_items % ITEMS_PER_PAGE == 0) ? (current_page < (num_items / ITEMS_PER_PAGE)) : (current_page < (num_items / ITEMS_PER_PAGE) + 1)) {
-        current_page++;
-        draw_page();
-      }
+  for(i = 0; i < ITEMS_PER_PAGE; i++) {
+    current_item = menu_list[i + (ITEMS_PER_PAGE * (current_page - 1))];
+    if(current_item.id != 0) {
+      y_pos = i * (MENU_ITEM_CONTAINER_HEIGHT + MARGIN) + HEADER_SIZE;
+      tft.fillRect(MARGIN, y_pos, tft.width() - MARGIN * 2, MENU_ITEM_CONTAINER_HEIGHT, BLACK);
+      tft.setCursor(MARGIN * 2, y_pos + 10);
+      tft.print(current_item.title);
+      tft.setCursor(tft.width() - MARGIN - 40, y_pos + 10);
+      tft.print("$");
+      tft.print(current_item.price);
     }
   }
+
+  tft.setTextColor(BLACK);
+
+  // Page number
+  tft.setCursor(MARGIN, tft.height() - MARGIN - 15);
+  tft.print("Page ");
+  tft.print((int)current_page);
+
+  // Live total price of order
+  tft.setCursor(tft.width() - MARGIN - 100, tft.height() - MARGIN - 15);
+  tft.print("Cost:");
+  tft.setCursor(tft.width() - MARGIN - 40, tft.height() - MARGIN - 15);
+  tft.print("$");
+  tft.print(total_cost);
 }
