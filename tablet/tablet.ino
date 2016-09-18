@@ -130,17 +130,19 @@ void draw_page() {
   tft.print(total_cost);
 }
 
-void confirm_order() {
-  tft.fillScreen(GREEN);
+void message(boolean error) {
+  tft.fillScreen(error ? RED : GREEN);
   tft.setTextSize(3);
   tft.setTextColor(WHITE);
-  tft.setCursor(tft.width() / 2 - 45, tft.height() / 2 - 11);
-  tft.print("Order");
-  tft.setCursor(tft.width() / 2 - 85, tft.height() / 2 + 11);
-  tft.print("confirmed!");
+  tft.setCursor(tft.width() / 2 - (error ? 75 : 45), tft.height() / 2 - 11);
+  tft.print(error ? "Could not" : "Order");
+  tft.setCursor(tft.width() / 2 - (error ? 65 : 85), tft.height() / 2 + 11);
+  tft.print(error ? "connect!" : "confirmed!");
   delay(3000);
-  total_cart_items = 0;
-  total_cost = 0;
+  if (!error) {
+    total_cart_items = 0;
+    total_cost = 0;
+  }
   draw_page();
 }
 
@@ -239,6 +241,56 @@ void get_server_content()
 #define MINPRESSURE 10
 #define MAXPRESSURE 1000
 
+boolean submit_order()
+{
+  char c = 0;
+  String response = "";
+  String post_data = "{\"orders\": [";
+
+  for(int i = 0; i < total_cart_items; i++)
+  {
+    post_data.concat(cart_menu_ids[i]);
+    if(i != (total_cart_items - 1))
+      post_data.concat(",");
+  }
+
+  post_data.concat("]}");
+
+  Serial.println(post_data);
+  
+  if (client.connect(server, 80)) {
+    Serial.println("connected");
+    // Make a HTTP request:
+    client.println("POST /kitchen/order/ HTTP/1.1");
+    client.println("Host: 104.131.189.231");
+    client.println("Connection: close");
+    client.print("Content-Length: ");
+    client.println(post_data.length());
+    client.println();
+    client.println(post_data);
+
+    delay(300);
+
+    while(client.available()) {
+      c = client.read();
+      response.concat(c);
+    }
+
+    Serial.println(response);
+
+    if (!client.connected()) {
+      client.stop();
+    }
+    
+    return (response.indexOf("true") > -1);
+  } else {
+    // if you didn't get a connection to the server:
+    Serial.println("connection failed");
+  }
+
+  return false;
+}
+
 void loop()
 {
   digitalWrite(13, HIGH);
@@ -256,21 +308,14 @@ void loop()
   }
 
   if (p.z > MINPRESSURE && p.z < MAXPRESSURE) {
-    /*
-    Serial.print("X = "); Serial.print(p.x);
-    Serial.print("\tY = "); Serial.print(p.y);
-    Serial.print("\tPressure = "); Serial.println(p.z);
-    */
-    
     // scale from 0->1023 to tft.width
     p.x = map(p.x, TS_MINX, TS_MAXX, tft.width(), 0);
     p.y = (tft.height()-map(p.y, TS_MINY, TS_MAXY, tft.height(), 0));
 
     // Confirm button pressed, post order to server and reset order
     if (p.x >= CONFIRM_BOX_X && p.x <= (NEXT_BOX_X - MARGIN) && p.y >= CONFIRM_BOX_Y && p.y <= (CONFIRM_BOX_Y + BOXSIZE)) {
-      // Post order to server somehow
-      if (total_cart_items > 0) { // and if order sent:
-        confirm_order();
+      if (total_cart_items > 0) {
+        message(!submit_order() /*if there was an error posting the order*/);
       }
     }
 
@@ -283,28 +328,27 @@ void loop()
       if(box_index_pressed < ITEMS_PER_PAGE)
       {
         to_add = menu_list[box_index_pressed + (ITEMS_PER_PAGE * (current_page - 1))];
-        total_cost += to_add.price;
-        cart_menu_ids[total_cart_items] = to_add.id;
-        total_cart_items++;
+        if (to_add.id > 0) {
+          total_cost += to_add.price;
+          cart_menu_ids[total_cart_items] = to_add.id;
+          total_cart_items++;
+          draw_page();
+        }
       }
-
-      draw_page();
     }
     
     if ((p.x >= PREVIOUS_BOX_X && p.x <= (PREVIOUS_BOX_X + BOXSIZE)) && (p.y >= PREVIOUS_BOX_Y && p.y <= (PREVIOUS_BOX_Y + BOXSIZE))) {
       // "Previous Page" button pressed.
       if(current_page > 1) {
         current_page--;
+        draw_page();
       }
-
-      draw_page();
     } else if ((p.x >= NEXT_BOX_X && p.x <= (NEXT_BOX_X + BOXSIZE)) && (p.y >= NEXT_BOX_Y && p.y <= (NEXT_BOX_Y + BOXSIZE))) {
       // "Next Page" button pressed.
       if((num_items % ITEMS_PER_PAGE == 0) ? (current_page < (num_items / ITEMS_PER_PAGE)) : (current_page < (num_items / ITEMS_PER_PAGE) + 1)) {
         current_page++;
+        draw_page();
       }
-
-      draw_page();
     }
   }
 }
