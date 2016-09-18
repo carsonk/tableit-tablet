@@ -52,7 +52,13 @@ struct MenuItem {
 };
 
 MenuItem menu_list[20];
-char current_page = 1;
+char current_page = 2;
+
+#define PREVIOUS_BOX_X MARGIN
+#define PREVIOUS_BOX_Y MARGIN
+
+#define NEXT_BOX_X (tft.width() - BOXSIZE - MARGIN)
+#define NEXT_BOX_Y MARGIN
 
 void draw_page() {
   int i = 0;
@@ -60,16 +66,11 @@ void draw_page() {
   int frame_end = tft.height() - MARGIN;
   int y_pos = 0;
   MenuItem current_item;
-  
-  tft.reset();
-
-  tft.begin(0x9341);
-  tft.setRotation(2);
 
   tft.fillScreen(WHITE);
   
-  tft.fillRect(MARGIN, MARGIN, BOXSIZE, BOXSIZE, RED); // Page back.
-  tft.fillRect(tft.width() - BOXSIZE - MARGIN, MARGIN, BOXSIZE, BOXSIZE, GREEN); // Page forward.
+  tft.fillRect(PREVIOUS_BOX_X, PREVIOUS_BOX_Y, BOXSIZE, BOXSIZE, RED); // Page back.
+  tft.fillRect(NEXT_BOX_X, NEXT_BOX_Y, BOXSIZE, BOXSIZE, GREEN); // Page forward.
 
   tft.setTextSize(2);
 
@@ -90,6 +91,11 @@ void draw_page() {
 void setup(void) {
   Serial.begin(9600);
   Serial.println(F("MENU start."));
+
+  tft.reset();
+
+  tft.begin(0x9341);
+  tft.setRotation(2);
 
   int i = 0;
   MenuItem item;
@@ -150,6 +156,22 @@ void loop()
     
     if ((p.y-PENRADIUS) && ((p.y+PENRADIUS) < tft.height())) {
       tft.fillCircle(p.x, p.y, PENRADIUS, currentcolor);
+    }
+
+    if ((p.x >= PREVIOUS_BOX_X && p.x <= (PREVIOUS_BOX_X + BOXSIZE)) && (p.y >= PREVIOUS_BOX_Y && p.y <= (PREVIOUS_BOX_Y + BOXSIZE))) {
+      if(current_page > 1) {
+        current_page--;
+      }
+
+      draw_page();
+    }
+
+    if ((p.x >= NEXT_BOX_X && p.x <= (NEXT_BOX_X + BOXSIZE)) && (p.y >= NEXT_BOX_Y && p.y <= (NEXT_BOX_Y + BOXSIZE))) {
+      if(current_page < 5) {
+        current_page++;
+      }
+
+      draw_page();
     }
   }
 }
