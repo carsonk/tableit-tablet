@@ -41,12 +41,12 @@ Adafruit_TFTLCD tft(LCD_CS, LCD_CD, LCD_WR, LCD_RD, LCD_RESET);
 #define MARGIN 10
 #define PENRADIUS 3
 
-#define MENU_ITEM_CONTAINER_HEIGHT 50
+#define MENU_ITEM_CONTAINER_HEIGHT 40
 #define HEADER_SIZE (BOXSIZE + (MARGIN * 2))
 
 #define ITEMS_PER_PAGE 4
 
-int oldcolor, currentcolor;
+int currentcolor;
 
 struct MenuItem {
   char title[10];
@@ -54,7 +54,8 @@ struct MenuItem {
 };
 
 MenuItem menu_list[20];
-char current_page = 2;
+char num_items = 20;
+char current_page = 1;
 
 #define PREVIOUS_BOX_X MARGIN
 #define PREVIOUS_BOX_Y MARGIN
@@ -62,7 +63,7 @@ char current_page = 2;
 #define NEXT_BOX_X (tft.width() - BOXSIZE - MARGIN)
 #define NEXT_BOX_Y MARGIN
 
-IPAddress ip(192, 168, 0, 177);
+IPAddress ip(192, 168, 0, 117);
 EthernetClient client;
 StaticJsonBuffer<200> jsonBuffer;
 
@@ -76,11 +77,15 @@ void draw_page() {
   MenuItem current_item;
 
   tft.fillScreen(WHITE);
+  tft.setTextSize(2);
+  tft.setTextColor(WHITE);
   
   tft.fillRect(PREVIOUS_BOX_X, PREVIOUS_BOX_Y, BOXSIZE, BOXSIZE, RED); // Page back.
-  tft.fillRect(NEXT_BOX_X, NEXT_BOX_Y, BOXSIZE, BOXSIZE, GREEN); // Page forward.
-
-  tft.setTextSize(2);
+  tft.setCursor(PREVIOUS_BOX_X + MARGIN, PREVIOUS_BOX_Y + MARGIN);
+  tft.print('<');
+  tft.fillRect(NEXT_BOX_X, NEXT_BOX_Y, BOXSIZE, BOXSIZE, RED); // Page forward.
+  tft.setCursor(NEXT_BOX_X + MARGIN, NEXT_BOX_Y + MARGIN);
+  tft.print('>');
 
   for(i = 0; i < ITEMS_PER_PAGE; i++) {
     current_item = menu_list[i + (ITEMS_PER_PAGE * (current_page - 1))];
@@ -92,6 +97,20 @@ void draw_page() {
     tft.print("$");
     tft.print(current_item.price);
   }
+
+  tft.setTextColor(BLACK);
+
+  // Page number
+  tft.setCursor(MARGIN, tft.height() - MARGIN - 15);
+  tft.print("Page ");
+  tft.print((int)current_page);
+
+  // Live total price of order
+  tft.setCursor(tft.width() - MARGIN - 100, tft.height() - MARGIN - 15);
+  tft.print("Cost:");
+  tft.setCursor(tft.width() - MARGIN - 40, tft.height() - MARGIN - 15);
+  tft.print("$");
+  tft.print("100"); // Replace with live sum of order items
 }
 
 void setup(void) {
