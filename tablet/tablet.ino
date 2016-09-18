@@ -49,6 +49,7 @@ Adafruit_TFTLCD tft(LCD_CS, LCD_CD, LCD_WR, LCD_RD, LCD_RESET);
 int currentcolor;
 
 struct MenuItem {
+  int id;
   char title[10];
   int price;
 };
@@ -56,6 +57,10 @@ struct MenuItem {
 MenuItem menu_list[20];
 char num_items = 20;
 char current_page = 1;
+int total_cost = 0;
+
+int cart_menu_ids[20];
+int total_cart_items = 0;
 
 #define PREVIOUS_BOX_X MARGIN
 #define PREVIOUS_BOX_Y MARGIN
@@ -110,7 +115,7 @@ void draw_page() {
   tft.print("Cost:");
   tft.setCursor(tft.width() - MARGIN - 40, tft.height() - MARGIN - 15);
   tft.print("$");
-  tft.print("100"); // Replace with live sum of order items
+  tft.print(total_cost);
 }
 
 void setup(void) {
@@ -159,6 +164,7 @@ void setup(void) {
   char title[10] = "Potato";
 
   for(i = 0; i < 20; i++) {
+    item.id = i;
     item.title[0] = 0x0;
     memcpy(&item.title, (void *)title, String("Potato").length() + 1);
     item.price = 1 + i;
@@ -201,16 +207,32 @@ void loop()
     if ((p.y-PENRADIUS) && ((p.y+PENRADIUS) < tft.height())) {
       tft.fillCircle(p.x, p.y, PENRADIUS, currentcolor);
     }
+    
+    if(p.y >= HEADER_SIZE && p.x >= MARGIN && p.y <= (tft.height() - MARGIN))
+    {
+      int box_index_pressed = (p.y - HEADER_SIZE) / (MENU_ITEM_CONTAINER_HEIGHT + MARGIN);
+      MenuItem to_add;
+      
+      if(box_index_pressed < ITEMS_PER_PAGE)
+      {
+        to_add = menu_list[box_index_pressed + (ITEMS_PER_PAGE * (current_page - 1))];
+        total_cost += to_add.price;
+        cart_menu_ids[total_cart_items] = to_add.id;
+        total_cart_items++;
+      }
 
+      draw_page();
+    }
+    
     if ((p.x >= PREVIOUS_BOX_X && p.x <= (PREVIOUS_BOX_X + BOXSIZE)) && (p.y >= PREVIOUS_BOX_Y && p.y <= (PREVIOUS_BOX_Y + BOXSIZE))) {
+      // "Previous Page" button pressed.
       if(current_page > 1) {
         current_page--;
       }
 
       draw_page();
-    }
-
-    if ((p.x >= NEXT_BOX_X && p.x <= (NEXT_BOX_X + BOXSIZE)) && (p.y >= NEXT_BOX_Y && p.y <= (NEXT_BOX_Y + BOXSIZE))) {
+    } else if ((p.x >= NEXT_BOX_X && p.x <= (NEXT_BOX_X + BOXSIZE)) && (p.y >= NEXT_BOX_Y && p.y <= (NEXT_BOX_Y + BOXSIZE))) {
+      // "Next Page" button pressed.
       if(current_page < 5) {
         current_page++;
       }
