@@ -111,7 +111,7 @@ void setup(void) {
   pinMode(13, OUTPUT);
 }
 
-#define MINPRESSURE 10
+#define MINPRESSURE 5
 #define MAXPRESSURE 1000
 
 void loop()
