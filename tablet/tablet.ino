@@ -86,6 +86,8 @@ void setup(void) {
   tft.begin(0x9341);
   tft.setRotation(2);
 
+  draw_title_screen();
+
   if (Ethernet.begin(mac) == 0) {
     Serial.println("Failed to configure Ethernet using DHCP");
     // try to congifure using IP address instead of DHCP:
@@ -106,6 +108,9 @@ void setup(void) {
   } else {
     // if you didn't get a connection to the server:
     Serial.println("connection failed");
+    message(true);
+    cli();
+    while (true); // Could not connect, end program
   }
  
   pinMode(13, OUTPUT);
@@ -138,7 +143,8 @@ void loop()
     // Confirm button pressed, post order to server and reset order
     if (p.x >= CONFIRM_BOX_X && p.x <= (NEXT_BOX_X - MARGIN) && p.y >= CONFIRM_BOX_Y && p.y <= (CONFIRM_BOX_Y + BOXSIZE)) {
       if (total_cart_items > 0) {
-        message(!submit_order() /*if there was an error posting the order*/);
+        message(!submit_order());
+        draw_page();
       }
     }
 
@@ -303,14 +309,25 @@ void message(boolean error) {
     total_cart_items = 0;
     total_cost = 0;
   }
-  draw_page();
+}
+
+void draw_title_screen() {
+  tft.fillScreen(WHITE);
+  tft.setTextSize(3);
+  tft.setTextColor(BLACK);
+  tft.setCursor(MARGIN, MARGIN);
+  tft.print("Welcome to");
+  tft.setCursor(MARGIN, 50);
+  tft.print("TABLEits!");
+  tft.setCursor(MARGIN, 240);
+  tft.print("Trying to");
+  tft.setCursor(MARGIN, 280);
+  tft.print("connect...");
 }
 
 /* Draws out the standard menu  ordering page. */
 void draw_page() {
   int i = 0;
-  int frame_start = (MARGIN * 2) + BOXSIZE + MARGIN;
-  int frame_end = tft.height() - MARGIN;
   int y_pos = 0;
   MenuItem current_item;
 
